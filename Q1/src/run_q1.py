@@ -1,6 +1,7 @@
 import os
 from Q1.src.io import load_data, build_graph, id_to_name_map
 from Q1.src.centrality import compute_centralities, top_k
+from Q1.src.plots import deg_vs_eig_plot_and_outliers
 
 
 def main():
@@ -18,6 +19,15 @@ def main():
 
     df = compute_centralities(G, id2name)
     df.to_csv(f"{out_tables}/a1_all_centralities.csv", index=False)
+        # (a).2 Degree vs Eigenvector scatter + outlier table
+    deg_vs_eig_plot_and_outliers(
+        df=df,
+        out_png="Q1/outputs/figures/a2_deg_vs_eig.png",
+        out_csv="Q1/outputs/tables/a2_lowdeg_higheig_outliers.csv",
+        min_degree_rank=100,
+        top_n=30,
+    )
+
 
     top_k(df, "norm_degree", 10).to_csv(f"{out_tables}/a1_top10_norm_degree.csv", index=False)
     top_k(df, "eigenvector", 10).to_csv(f"{out_tables}/a1_top10_eigenvector.csv", index=False)
