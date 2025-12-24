@@ -1,6 +1,6 @@
 import os
 from Q1.src.io import load_data, build_graph, id_to_name_map
-from Q1.src.centrality import compute_centralities, top_k, add_ranks, add_betweenness
+from Q1.src.centrality import compute_centralities, top_k, add_ranks, add_betweenness, betweenness_gap_table
 from Q1.src.plots import deg_vs_eig_plot_and_outliers
 
 
@@ -63,6 +63,10 @@ def main():
     top10_bet.to_csv(f"{out_tables}/b1_top10_betweenness.csv", index=False)
 
     print("Done: Q1(a).1–(b).1 outputs written.")
+
+#(b).2 betweenness_gap_table 
+    gap = betweenness_gap_table(df, top_k_bet=10)
+    gap.to_csv(f"{out_tables}/b2_betweenness_gap_table.csv", index=False)
 
 
 if __name__ == "__main__":
