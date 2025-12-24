@@ -150,3 +150,69 @@ def deg_vs_eig_plot_and_outliers(
 
     outliers.to_csv(out_csv, index=False)
     return outliers
+
+
+
+
+def degree_vs_closeness_plot(
+    df: pd.DataFrame,
+    out_png: str,
+    annotate_ids: list[int],
+):
+    plt.figure(figsize=(7, 5))
+
+    plt.scatter(df["norm_degree"], df["closeness"], s=10)
+
+    # annotate selected efficient monitors
+    for _, r in df[df["id"].isin(annotate_ids)].iterrows():
+        plt.annotate(
+            r["name"],
+            (r["norm_degree"], r["closeness"]),
+            fontsize=9,
+            xytext=(4, 4),
+            textcoords="offset points",
+        )
+
+    plt.xlabel("Normalized Degree")
+    plt.ylabel("Closeness Centrality")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=200)
+    plt.close()
+
+
+
+
+
+def ego_network_plot(
+    G: nx.Graph,
+    center_id: int,
+    out_png: str,
+    k: float = 0.35,
+    seed: int = 42,
+):
+    """
+    Ego network visualization:
+    - spring layout
+    - spacing control via k
+    - node size proportional to degree (within ego graph)
+    - label only center node
+    """
+    ego = nx.ego_graph(G, center_id, radius=1)
+
+    # Degree inside the ego graph for sizing
+    deg_ego = dict(ego.degree())
+    sizes = [50 + 15 * deg_ego[n] for n in ego.nodes()]
+
+    pos = nx.spring_layout(ego, k=k, seed=seed)
+
+    plt.figure(figsize=(8, 8))
+    nx.draw_networkx_nodes(ego, pos, node_size=sizes)
+    nx.draw_networkx_edges(ego, pos, alpha=0.35)
+
+    # Label only the central node
+    nx.draw_networkx_labels(ego, pos, labels={center_id: str(center_id)}, font_size=12)
+
+    plt.axis("off")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=200)
+    plt.close()
