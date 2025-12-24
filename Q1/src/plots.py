@@ -178,3 +178,41 @@ def degree_vs_closeness_plot(
     plt.tight_layout()
     plt.savefig(out_png, dpi=200)
     plt.close()
+
+
+
+
+
+def ego_network_plot(
+    G: nx.Graph,
+    center_id: int,
+    out_png: str,
+    k: float = 0.35,
+    seed: int = 42,
+):
+    """
+    Ego network visualization:
+    - spring layout
+    - spacing control via k
+    - node size proportional to degree (within ego graph)
+    - label only center node
+    """
+    ego = nx.ego_graph(G, center_id, radius=1)
+
+    # Degree inside the ego graph for sizing
+    deg_ego = dict(ego.degree())
+    sizes = [50 + 15 * deg_ego[n] for n in ego.nodes()]
+
+    pos = nx.spring_layout(ego, k=k, seed=seed)
+
+    plt.figure(figsize=(8, 8))
+    nx.draw_networkx_nodes(ego, pos, node_size=sizes)
+    nx.draw_networkx_edges(ego, pos, alpha=0.35)
+
+    # Label only the central node
+    nx.draw_networkx_labels(ego, pos, labels={center_id: str(center_id)}, font_size=12)
+
+    plt.axis("off")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=200)
+    plt.close()
