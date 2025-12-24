@@ -2,6 +2,7 @@ import os
 from Q1.src.io import load_data, build_graph, id_to_name_map
 from Q1.src.centrality import compute_centralities, top_k
 from Q1.src.plots import deg_vs_eig_plot_and_outliers
+from Q1.src.centrality import add_ranks
 
 
 def main():
@@ -26,6 +27,35 @@ def main():
         out_csv="Q1/outputs/tables/a2_lowdeg_higheig_outliers.csv",
         min_degree_rank=100,
         top_n=30,
+    )
+    
+
+        # add ranks
+    df = add_ranks(df)
+
+    # Q1(a).3 selection criteria
+    candidates = df[
+        (df["degree_rank"] > 100) &
+        (df["eigenvector_rank"] <= 50)
+    ].sort_values("eigenvector_rank")
+
+    # select top 3 by eigenvector rank
+    three_way = candidates.head(3)[
+        [
+            "id",
+            "name",
+            "degree",
+            "degree_rank",
+            "eigenvector",
+            "eigenvector_rank",
+            "closeness",
+            "closeness_rank",
+        ]
+    ]
+
+    three_way.to_csv(
+        "Q1/outputs/tables/a3_three_way_case_study.csv",
+        index=False
     )
 
 

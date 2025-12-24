@@ -25,3 +25,11 @@ def compute_centralities(G: nx.Graph, id2name: dict[int, str]) -> pd.DataFrame:
 
 def top_k(df: pd.DataFrame, col: str, k: int = 10) -> pd.DataFrame:
     return df.sort_values(col, ascending=False).head(k).copy()
+
+
+def add_ranks(df):
+    df = df.copy()
+    df["degree_rank"] = df["degree"].rank(method="min", ascending=False).astype(int)
+    df["eigenvector_rank"] = df["eigenvector"].rank(method="min", ascending=False).astype(int)
+    df["closeness_rank"] = df["closeness"].rank(method="min", ascending=False).astype(int)
+    return df
