@@ -69,5 +69,18 @@ def main():
     gap.to_csv(f"{out_tables}/b2_betweenness_gap_table.csv", index=False)
 
 
+    # Q1(c).1 Top 10 closeness (Efficient Monitors candidates)
+    top10_closeness_c1 = (
+        df.sort_values("closeness", ascending=False)
+          .head(10)
+          .loc[:, ["id", "name", "degree", "degree_rank", "closeness", "closeness_rank"]]
+    )
+
+    top10_closeness_c1.to_csv(
+        f"{out_tables}/c1_top10_closeness.csv",
+        index=False
+    )
+
+
 if __name__ == "__main__":
     main()
