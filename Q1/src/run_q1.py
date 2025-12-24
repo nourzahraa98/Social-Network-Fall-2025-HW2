@@ -1,7 +1,7 @@
 import os
 from Q1.src.io import load_data, build_graph, id_to_name_map
 from Q1.src.centrality import compute_centralities, top_k, add_ranks, add_betweenness, betweenness_gap_table
-from Q1.src.plots import deg_vs_eig_plot_and_outliers
+from Q1.src.plots import deg_vs_eig_plot_and_outliers, degree_vs_closeness_plot
 
 
 def main():
@@ -79,6 +79,28 @@ def main():
     top10_closeness_c1.to_csv(
         f"{out_tables}/c1_top10_closeness.csv",
         index=False
+    )
+
+    # Q1(c).2 Efficient Monitors:
+    # high closeness (top 20) + low degree (outside top 100)
+    efficient_monitors = df[
+        (df["closeness_rank"] <= 20) &
+        (df["degree_rank"] > 100)
+    ].sort_values("closeness_rank")
+
+    # select three
+    efficient_three = efficient_monitors.head(3)
+
+    efficient_three.to_csv(
+        f"{out_tables}/c2_efficient_monitors.csv",
+        index=False
+    )
+    
+
+    degree_vs_closeness_plot(
+        df=df,
+        out_png=f"{out_figures}/c2_degree_vs_closeness.png",
+        annotate_ids=efficient_three["id"].tolist(),
     )
 
 

@@ -150,3 +150,31 @@ def deg_vs_eig_plot_and_outliers(
 
     outliers.to_csv(out_csv, index=False)
     return outliers
+
+
+
+
+def degree_vs_closeness_plot(
+    df: pd.DataFrame,
+    out_png: str,
+    annotate_ids: list[int],
+):
+    plt.figure(figsize=(7, 5))
+
+    plt.scatter(df["norm_degree"], df["closeness"], s=10)
+
+    # annotate selected efficient monitors
+    for _, r in df[df["id"].isin(annotate_ids)].iterrows():
+        plt.annotate(
+            r["name"],
+            (r["norm_degree"], r["closeness"]),
+            fontsize=9,
+            xytext=(4, 4),
+            textcoords="offset points",
+        )
+
+    plt.xlabel("Normalized Degree")
+    plt.ylabel("Closeness Centrality")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=200)
+    plt.close()
