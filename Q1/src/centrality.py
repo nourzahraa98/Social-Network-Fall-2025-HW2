@@ -2,6 +2,7 @@ import pandas as pd
 import networkx as nx
 
 
+
 def compute_centralities(G: nx.Graph, id2name: dict[int, str]) -> pd.DataFrame:
     n = G.number_of_nodes()
 
@@ -32,4 +33,18 @@ def add_ranks(df):
     df["degree_rank"] = df["degree"].rank(method="min", ascending=False).astype(int)
     df["eigenvector_rank"] = df["eigenvector"].rank(method="min", ascending=False).astype(int)
     df["closeness_rank"] = df["closeness"].rank(method="min", ascending=False).astype(int)
+    return df
+
+
+
+
+def add_betweenness(df, G: nx.Graph, k: int = 800, seed: int = 42):
+    """
+    Approximate betweenness using k sampled sources.
+    Increase k for higher accuracy (slower).
+    """
+    bet = nx.betweenness_centrality(G, k=k, normalized=True, seed=seed)
+    df = df.copy()
+    df["betweenness"] = df["id"].map(bet)
+    df["betweenness_rank"] = df["betweenness"].rank(method="min", ascending=False).astype(int)
     return df
