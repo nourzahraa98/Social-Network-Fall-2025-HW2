@@ -181,6 +181,152 @@ def plot_loglog_scatter(
     plt.close()
 
 
+def compute_degrees(src: np.ndarray, dst: np.ndarray, n: int) -> Tuple[np.ndarray, np.ndarray]:
+    outdeg = np.bincount(src, minlength=n).astype(np.int64)
+    indeg = np.bincount(dst, minlength=n).astype(np.int64)
+    return indeg, outdeg
+
+
+def in_neighbor_lists(src: np.ndarray, dst: np.ndarray, n: int) -> List[List[int]]:
+    inn = [[] for _ in range(n)]
+    for u, v in zip(src.tolist(), dst.tolist()):
+        inn[v].append(u)
+    return inn
+
+
+def summarize_in_neighbors(
+    inn: List[List[int]],
+    outdeg: np.ndarray,
+    hub: np.ndarray,
+    pr: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    For each node v, compute mean over in-neighbors u->v of:
+      - outdeg[u]
+      - hub[u]
+      - pagerank[u]
+    If no in-neighbors: 0.
+    """
+    n = len(inn)
+    mean_in_outdeg = np.zeros(n, dtype=np.float64)
+    mean_in_hub = np.zeros(n, dtype=np.float64)
+    mean_in_pr = np.zeros(n, dtype=np.float64)
+
+    for v in range(n):
+        neigh = inn[v]
+        if not neigh:
+            continue
+        arr = np.array(neigh, dtype=np.int64)
+        mean_in_outdeg[v] = outdeg[arr].mean()
+        mean_in_hub[v] = hub[arr].mean()
+        mean_in_pr[v] = pr[arr].mean()
+
+    return mean_in_outdeg, mean_in_hub, mean_in_pr
+
+
+def select_representative_nodes(
+    auth_rank: np.ndarray,
+    pr_rank: np.ndarray,
+    k: int = 5,
+) -> Dict[str, np.ndarray]:
+    """
+    Uses delta = log10(PR_rank) - log10(Auth_rank).
+      +delta: PR rank worse than Authority rank (high Authority / low PR)
+      -delta: PR rank better than Authority rank (high PR / low Authority)
+    Returns indices for:
+      - auth_high_pr_low: top +delta
+      - pr_high_auth_low: top -delta
+      - near_diagonal: smallest |delta|
+    """
+    delta = np.log10(pr_rank.astype(np.float64)) - np.log10(auth_rank.astype(np.float64))
+    order_pos = np.argsort(-delta)  # largest first
+    order_neg = np.argsort(delta)   # most negative first
+    order_abs = np.argsort(np.abs(delta))
+
+    return {
+        "auth_high_pr_low": order_pos[:k],
+        "pr_high_auth_low": order_neg[:k],
+        "near_diagonal": order_abs[:k],
+        "delta": delta,  # keep for downstream use
+    }
+
+
+def save_outlier_table(
+    out_csv: Path,
+    idx2id: np.ndarray,
+    auth: np.ndarray,
+    hub: np.ndarray,
+    pr: np.ndarray,
+    auth_rank: np.ndarray,
+    pr_rank: np.ndarray,
+    indeg: np.ndarray,
+    outdeg: np.ndarray,
+    mean_in_outdeg: np.ndarray,
+    mean_in_hub: np.ndarray,
+    mean_in_pr: np.ndarray,
+    picks: Dict[str, np.ndarray],
+) -> None:
+    delta = picks["delta"]
+    chosen = np.unique(np.concatenate([picks["auth_high_pr_low"], picks["pr_high_auth_low"], picks["near_diagonal"]]))
+
+    header = (
+        "node_id,group,authority_rank,pagerank_rank,delta_log10,"
+        "indeg,outdeg,authority_score,hub_score,pagerank_score,"
+        "mean_in_neighbor_outdeg,mean_in_neighbor_hub,mean_in_neighbor_pagerank\n"
+    )
+
+    def group_of(i: int) -> str:
+        if i in set(picks["auth_high_pr_low"].tolist()):
+            return "auth_high_pr_low"
+        if i in set(picks["pr_high_auth_low"].tolist()):
+            return "pr_high_auth_low"
+        if i in set(picks["near_diagonal"].tolist()):
+            return "near_diagonal"
+        return "selected"
+
+    with out_csv.open("w", encoding="utf-8") as f:
+        f.write(header)
+        for i in chosen.tolist():
+            f.write(
+                f"{int(idx2id[i])},{group_of(i)},"
+                f"{int(auth_rank[i])},{int(pr_rank[i])},{delta[i]:.6f},"
+                f"{int(indeg[i])},{int(outdeg[i])},"
+                f"{auth[i]:.12e},{hub[i]:.12e},{pr[i]:.12e},"
+                f"{mean_in_outdeg[i]:.6f},{mean_in_hub[i]:.12e},{mean_in_pr[i]:.12e}\n"
+            )
+
+
+def plot_annotated_outliers(
+    out_png: Path,
+    auth_rank: np.ndarray,
+    pr_rank: np.ndarray,
+    idx2id: np.ndarray,
+    picks: Dict[str, np.ndarray],
+) -> None:
+    x = auth_rank.astype(np.float64)
+    y = pr_rank.astype(np.float64)
+
+    chosen = np.unique(np.concatenate([picks["auth_high_pr_low"], picks["pr_high_auth_low"], picks["near_diagonal"]]))
+
+    plt.figure()
+    plt.scatter(x, y, s=8, alpha=0.35)
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel("HITS Authority Rank (1 = best)")
+    plt.ylabel("PageRank Rank (1 = best)")
+    plt.title("Annotated outliers (log-log)")
+
+    # highlight chosen
+    plt.scatter(x[chosen], y[chosen], s=28, alpha=0.9)
+
+    for i in chosen.tolist():
+        plt.annotate(str(int(idx2id[i])), (x[i], y[i]), fontsize=7)
+
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=220)
+    plt.close()
+
+
 def resolve_default_input(user_path: str | None) -> Path:
     if user_path is not None:
         return Path(user_path)
@@ -212,10 +358,17 @@ def main() -> None:
     n = len(idx2id)
 
     pr = pagerank_power_iteration(src, dst, n, alpha=args.alpha, tol=args.tol, max_iter=args.max_iter)
-    _, auth = hits_authority(src, dst, n, tol=args.tol, max_iter=args.max_iter)
+    hub, auth = hits_authority(src, dst, n, tol=args.tol, max_iter=args.max_iter)
 
     pr_rank = ranks_from_scores(pr)
     auth_rank = ranks_from_scores(auth)
+
+    indeg, outdeg = compute_degrees(src, dst, n)
+    inn = in_neighbor_lists(src, dst, n)
+    mean_in_outdeg, mean_in_hub, mean_in_pr = summarize_in_neighbors(inn, outdeg, hub, pr)
+
+    picks = select_representative_nodes(auth_rank, pr_rank, k=5)
+
 
     out_fig_dir = PROJECT_ROOT / "Q2" / "outputs" / "figures"
     out_tab_dir = PROJECT_ROOT / "Q2" / "outputs" / "tables"
@@ -226,6 +379,23 @@ def main() -> None:
 
     save_rank_table(out_csv, idx2id, auth, pr, auth_rank, pr_rank)
     plot_loglog_scatter(out_png, auth_rank, pr_rank)
+
+    out_outliers_csv = out_tab_dir / "q2a_outliers.csv"
+    out_outliers_png = out_fig_dir / "q2a_outliers_annotated.png"
+
+    save_outlier_table(
+        out_outliers_csv,
+        idx2id, auth, hub, pr,
+        auth_rank, pr_rank,
+        indeg, outdeg,
+        mean_in_outdeg, mean_in_hub, mean_in_pr,
+        picks,
+    )
+    plot_annotated_outliers(out_outliers_png, auth_rank, pr_rank, idx2id, picks)
+
+    print(f"[OK] Saved outliers: {out_outliers_csv}")
+    print(f"[OK] Saved annotated figure: {out_outliers_png}")
+
 
     print(f"[OK] Saved ranks: {out_csv}")
     print(f"[OK] Saved figure: {out_png}")
