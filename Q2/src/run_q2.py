@@ -374,6 +374,33 @@ def plot_rank_trajectories(
     plt.savefig(out_png, dpi=220)
     plt.close()
 
+def summarize_trajectories(
+    out_csv: Path,
+    alphas: np.ndarray,
+    idx2id: np.ndarray,
+    nodes_idx: List[int],
+    ranks_matrix: np.ndarray,
+) -> None:
+    """
+    Summarize each node by:
+      - rank at alpha_min and alpha_max
+      - best/worst rank across sweep
+      - simple slope sign using linear fit (trend)
+    """
+    x = alphas.astype(np.float64)
+    header = "node_id,rank_at_0.50,rank_at_0.99,best_rank,worst_rank,trend_slope\n"
+    with out_csv.open("w", encoding="utf-8") as f:
+        f.write(header)
+        for ni in nodes_idx:
+            y = ranks_matrix[:, ni].astype(np.float64)
+            # linear trend
+            slope = np.polyfit(x, y, 1)[0]
+            f.write(
+                f"{int(idx2id[ni])},"
+                f"{int(y[0])},{int(y[-1])},"
+                f"{int(y.min())},{int(y.max())},"
+                f"{slope:.6f}\n"
+            )
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -480,6 +507,10 @@ def main() -> None:
     out_png = out_fig_dir / "q2b_rank_trajectories.png"
     save_trajectory_table(out_csv, alphas, idx2id, nodes_to_track, ranks_matrix)
     plot_rank_trajectories(out_png, alphas, idx2id, nodes_to_track, ranks_matrix)
+    
+    out_sum = out_tab_dir / "q2b_trajectory_summary.csv"
+    summarize_trajectories(out_sum, alphas, idx2id, nodes_to_track, ranks_matrix)
+    print(f"[OK] Saved trajectory summary: {out_sum}")
 
     print(f"[OK] Tracked nodes: {len(nodes_to_track)} (top-{args.k} @ alpha=0.85 + anomalies)")
     print(f"[OK] Saved trajectories table: {out_csv}")
